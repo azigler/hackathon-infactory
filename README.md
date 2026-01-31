@@ -4,6 +4,8 @@
 
 A hackathon project for The Atlantic + Infactory Hackathon (January 2026)
 
+**[Live Demo](https://hackathon-infactory.vercel.app)**
+
 ---
 
 ## The Pitch

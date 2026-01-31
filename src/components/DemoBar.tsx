@@ -78,7 +78,7 @@ export function DemoBar() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-atlantic-charcoal/95 backdrop-blur-sm border-b border-atlantic-gold/30">
+    <div className="bg-atlantic-charcoal/95 backdrop-blur-sm border-b border-atlantic-gold/30">
       <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
         {/* Demo Label */}
         <div className="flex items-center gap-2">

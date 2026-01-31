@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 // Components
 import { DemoBar } from './components/DemoBar'
@@ -18,24 +18,13 @@ import { WritingStation } from './pages/student/WritingStation'
 import { CitationReview } from './pages/student/CitationReview'
 import { SubmissionConfirmation } from './pages/student/SubmissionConfirmation'
 
-// Check if demo controls should be visible
-function useDemoBarVisible() {
-  const [searchParams] = useSearchParams()
-  const isDev = import.meta.env.DEV
-  const hasParam = searchParams.get('demo') === 'true'
-  return isDev || hasParam
-}
-
 function AppContent() {
-  const isDemoBarVisible = useDemoBarVisible()
-
   return (
     <>
       {/* Demo Bar - persistent across all pages, only visible in dev mode or with ?demo=true */}
       <DemoBar />
 
-      {/* Add top padding only when DemoBar is visible */}
-      <div className={isDemoBarVisible ? 'pt-10' : ''}>
+      <div>
         <Routes>
           {/* Entry */}
           <Route path="/" element={<LoginPage />} />

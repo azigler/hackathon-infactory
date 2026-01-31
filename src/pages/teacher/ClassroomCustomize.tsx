@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { PageLayout } from '../../components/layout/PageLayout'
 import { useAppStore } from '../../lib/stores/app-store'
@@ -8,6 +8,13 @@ import { AI_ARTICLES } from '../../data/ai-articles'
 
 // Combine all suggested articles for the demo
 const SUGGESTED_ARTICLES: CuratedArticle[] = [...CLIMATE_CHANGE_ARTICLES, ...AI_ARTICLES]
+
+// Type for article metadata that can come from either curated list or API
+interface ArticleMetadata {
+  title: string
+  author: string
+  chunk_id: string
+}
 
 export function ClassroomCustomize() {
   const { classroomId } = useParams()
@@ -29,6 +36,47 @@ export function ClassroomCustomize() {
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
+
+  // State to store fetched article metadata for articles not in the curated list
+  const [fetchedArticleMetadata, setFetchedArticleMetadata] = useState<Map<string, ArticleMetadata>>(new Map())
+
+  // Fetch metadata for custom articles that aren't in the curated list
+  useEffect(() => {
+    const fetchMissingMetadata = async () => {
+      if (!classroom?.customArticles || classroom.customArticles.length === 0) {
+        return
+      }
+
+      // Find articles that aren't in the curated list
+      const missingIds = classroom.customArticles.filter(
+        (articleId) => !SUGGESTED_ARTICLES.some((a) => a.chunk_id === articleId)
+      )
+
+      if (missingIds.length === 0) {
+        return
+      }
+
+      try {
+        // Fetch article metadata from the API
+        const results = await infactory.getArticlesByChunkIds(missingIds)
+        const newMetadata = new Map<string, ArticleMetadata>()
+
+        for (const result of results) {
+          newMetadata.set(result.chunk.chunk_id, {
+            title: result.chunk.title,
+            author: result.chunk.author,
+            chunk_id: result.chunk.chunk_id,
+          })
+        }
+
+        setFetchedArticleMetadata(newMetadata)
+      } catch (error) {
+        console.error('Failed to fetch article metadata:', error)
+      }
+    }
+
+    fetchMissingMetadata()
+  }, [classroom?.customArticles])
 
   if (!classroom) {
     return (
@@ -152,21 +200,23 @@ export function ClassroomCustomize() {
           ) : (
             <ul className="space-y-2">
               {(classroom.customArticles || []).map((articleId) => {
-                // Try to find title from suggested articles
+                // Try to find title from suggested articles, then from fetched metadata
                 const suggestedArticle = SUGGESTED_ARTICLES.find(a => a.chunk_id === articleId)
+                const fetchedMetadata = fetchedArticleMetadata.get(articleId)
+                const articleData = suggestedArticle || fetchedMetadata
                 return (
                   <li
                     key={articleId}
                     className="flex items-center justify-between p-3 bg-atlantic-cream rounded"
                   >
                     <div className="flex-1 min-w-0">
-                      {suggestedArticle ? (
+                      {articleData ? (
                         <>
                           <span className="font-medium text-atlantic-charcoal truncate block">
-                            {suggestedArticle.title}
+                            {articleData.title}
                           </span>
                           <span className="text-sm text-atlantic-stone">
-                            {suggestedArticle.author}
+                            {articleData.author}
                           </span>
                         </>
                       ) : (

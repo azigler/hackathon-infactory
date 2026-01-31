@@ -58,6 +58,37 @@ function transformCuratedArticle(article: CuratedArticle): Article {
   }
 }
 
+// Build a lookup map for curated article content by chunk_id
+// This allows enriching API results with full content when available
+function buildCuratedContentMap(): Map<string, string> {
+  const contentMap = new Map<string, string>()
+  const allCuratedArticles = [...CLIMATE_CHANGE_ARTICLES, ...AI_ARTICLES]
+  for (const article of allCuratedArticles) {
+    const fullContent = getArticleContent(article)
+    contentMap.set(article.chunk_id, fullContent)
+  }
+  return contentMap
+}
+
+// Transform API SearchResult to Article format, enriching with curated content when available
+function transformSearchResult(result: SearchResult, curatedContentMap: Map<string, string>): Article {
+  // Check if we have curated full content for this article
+  const curatedContent = curatedContentMap.get(result.chunk.chunk_id)
+  // Use curated full content if available, otherwise fall back to API excerpt
+  const content = curatedContent || result.chunk.excerpt
+
+  return {
+    id: result.chunk.chunk_id,
+    title: result.chunk.title,
+    author: result.chunk.author,
+    year: result.chunk.published_at.split('-')[0],
+    excerpt: result.chunk.excerpt.slice(0, 200) + '...',
+    content: content,
+    topic: result.chunk.topic,
+    section: result.chunk.section,
+  }
+}
+
 // Get fallback articles for a topic
 function getFallbackArticles(topicId: string): Article[] {
   switch (topicId) {
@@ -181,6 +212,9 @@ export function ResearchWorkspace() {
       let defaultArticles: Article[] = []
       let customArticles: Article[] = []
 
+      // Build curated content map once for enriching API results
+      const curatedContentMap = buildCuratedContentMap()
+
       try {
         // Step 1: Always fetch default topic-based articles first
         const query = TOPIC_QUERIES[topicId] || 'artificial intelligence'
@@ -189,18 +223,11 @@ export function ResearchWorkspace() {
         const results = await infactory.search(query, { top_k: 10 })
         console.log('API returned', results?.length || 0, 'default topic results')
 
-        // Transform API results to our Article format
+        // Transform API results to our Article format, enriching with curated content
         if (results && results.length > 0) {
-          defaultArticles = results.map((result: SearchResult) => ({
-            id: result.chunk.chunk_id,
-            title: result.chunk.title,
-            author: result.chunk.author,
-            year: result.chunk.published_at.split('-')[0],
-            excerpt: result.chunk.excerpt.slice(0, 200) + '...',
-            content: result.chunk.excerpt, // Full excerpt as content
-            topic: result.chunk.topic,
-            section: result.chunk.section,
-          }))
+          defaultArticles = results.map((result: SearchResult) =>
+            transformSearchResult(result, curatedContentMap)
+          )
         }
 
         // Step 2: If the classroom has custom articles, fetch those additionally
@@ -214,16 +241,9 @@ export function ResearchWorkspace() {
           console.log('Custom articles API returned', customResults?.length || 0, 'results')
 
           if (customResults && customResults.length > 0) {
-            customArticles = customResults.map((result: SearchResult) => ({
-              id: result.chunk.chunk_id,
-              title: result.chunk.title,
-              author: result.chunk.author,
-              year: result.chunk.published_at.split('-')[0],
-              excerpt: result.chunk.excerpt.slice(0, 200) + '...',
-              content: result.chunk.excerpt, // Full excerpt as content
-              topic: result.chunk.topic,
-              section: result.chunk.section,
-            }))
+            customArticles = customResults.map((result: SearchResult) =>
+              transformSearchResult(result, curatedContentMap)
+            )
           }
 
           // If API didn't return all custom articles, try to find them in curated data as fallback

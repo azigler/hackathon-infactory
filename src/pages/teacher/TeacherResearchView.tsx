@@ -1,16 +1,8 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { infactory, type SearchResult } from '../../lib/api/infactory'
 import { useAppStore } from '../../lib/stores/app-store'
 import { CLIMATE_CHANGE_ARTICLES, type CuratedArticle, getArticleContent } from '../../data/climate-change-articles'
 import { AI_ARTICLES } from '../../data/ai-articles'
-
-// Map topic IDs to search queries
-const TOPIC_QUERIES: Record<string, string> = {
-  'artificial-intelligence': 'artificial intelligence machine learning AI consciousness',
-  'climate-change': 'climate change global warming environment IPCC',
-  'technology-society': 'technology society democracy digital',
-}
 
 const TOPIC_TITLES: Record<string, string> = {
   'artificial-intelligence': 'Artificial Intelligence: Promise and Peril',
@@ -44,8 +36,8 @@ function transformCuratedArticle(article: CuratedArticle): Article {
   }
 }
 
-// Get fallback articles for a topic
-function getFallbackArticles(topicId: string): Article[] {
+// Get curated articles for a topic (with guaranteed full content)
+function getCuratedArticles(topicId: string): Article[] {
   switch (topicId) {
     case 'climate-change':
       return CLIMATE_CHANGE_ARTICLES.map(transformCuratedArticle)
@@ -156,53 +148,28 @@ export function TeacherResearchView() {
     return result
   }
 
-  // Fetch articles from Infactory API with fallback to curated data
+  // Load curated articles with full content
+  // Uses curated articles directly to ensure all articles have complete content (not truncated API excerpts)
   useEffect(() => {
-    async function fetchArticles() {
+    function loadArticles() {
       setLoading(true)
       setError(null)
 
-      let transformedArticles: Article[] = []
+      // Load curated articles for this topic (guaranteed to have full content)
+      const curatedArticles = getCuratedArticles(topicId)
+      console.log('Loaded', curatedArticles.length, 'curated articles for topic:', topicId)
 
-      try {
-        const query = TOPIC_QUERIES[topicId] || 'artificial intelligence'
-        console.log('Fetching articles for topic:', topicId, 'with query:', query)
-
-        const results = await infactory.search(query, { top_k: 10 })
-        console.log('API returned', results?.length || 0, 'results')
-
-        if (results && results.length > 0) {
-          transformedArticles = results.map((result: SearchResult) => ({
-            id: result.chunk.chunk_id,
-            title: result.chunk.title,
-            author: result.chunk.author,
-            year: result.chunk.published_at.split('-')[0],
-            excerpt: result.chunk.excerpt.slice(0, 200) + '...',
-            content: result.chunk.excerpt,
-            topic: result.chunk.topic,
-            section: result.chunk.section,
-          }))
-        }
-      } catch (err) {
-        console.error('API failed, falling back to curated data:', err)
-      }
-
-      if (transformedArticles.length === 0) {
-        console.log('Using fallback curated articles for topic:', topicId)
-        transformedArticles = getFallbackArticles(topicId)
-      }
-
-      if (transformedArticles.length === 0) {
+      if (curatedArticles.length === 0) {
         setError('No articles available for this topic. Please try again later.')
       } else {
-        setArticles(transformedArticles)
-        setSelectedArticle(transformedArticles[0])
+        setArticles(curatedArticles)
+        setSelectedArticle(curatedArticles[0])
       }
 
       setLoading(false)
     }
 
-    fetchArticles()
+    loadArticles()
   }, [topicId])
 
   const handleHighlight = () => {

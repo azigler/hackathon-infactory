@@ -1,6 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
-import { infactory, type SearchResult } from '../../lib/api/infactory'
 import { useAppStore } from '../../lib/stores/app-store'
 import { CLIMATE_CHANGE_ARTICLES, type CuratedArticle, getArticleContent } from '../../data/climate-change-articles'
 import { AI_ARTICLES } from '../../data/ai-articles'
@@ -11,13 +10,6 @@ function useDemoControlsVisible() {
   const isDev = import.meta.env.DEV
   const hasParam = searchParams.get('demo') === 'true'
   return isDev || hasParam
-}
-
-// Map topic IDs to search queries
-const TOPIC_QUERIES: Record<string, string> = {
-  'artificial-intelligence': 'artificial intelligence machine learning AI consciousness',
-  'climate-change': 'climate change global warming environment IPCC',
-  'technology-society': 'technology society democracy digital',
 }
 
 const TOPIC_TITLES: Record<string, string> = {
@@ -58,38 +50,7 @@ function transformCuratedArticle(article: CuratedArticle): Article {
   }
 }
 
-// Build a lookup map for curated article content by chunk_id
-// This allows enriching API results with full content when available
-function buildCuratedContentMap(): Map<string, string> {
-  const contentMap = new Map<string, string>()
-  const allCuratedArticles = [...CLIMATE_CHANGE_ARTICLES, ...AI_ARTICLES]
-  for (const article of allCuratedArticles) {
-    const fullContent = getArticleContent(article)
-    contentMap.set(article.chunk_id, fullContent)
-  }
-  return contentMap
-}
-
-// Transform API SearchResult to Article format, enriching with curated content when available
-function transformSearchResult(result: SearchResult, curatedContentMap: Map<string, string>): Article {
-  // Check if we have curated full content for this article
-  const curatedContent = curatedContentMap.get(result.chunk.chunk_id)
-  // Use curated full content if available, otherwise fall back to API excerpt
-  const content = curatedContent || result.chunk.excerpt
-
-  return {
-    id: result.chunk.chunk_id,
-    title: result.chunk.title,
-    author: result.chunk.author,
-    year: result.chunk.published_at.split('-')[0],
-    excerpt: result.chunk.excerpt.slice(0, 200) + '...',
-    content: content,
-    topic: result.chunk.topic,
-    section: result.chunk.section,
-  }
-}
-
-// Get fallback articles for a topic
+// Get curated articles for a topic (with guaranteed full content)
 function getFallbackArticles(topicId: string): Article[] {
   switch (topicId) {
     case 'climate-change':
@@ -202,73 +163,35 @@ export function ResearchWorkspace() {
     return result
   }
 
-  // Fetch articles from Infactory API with fallback to curated data
-  // Always loads default topic articles, and adds custom articles if the teacher specified them
+  // Load curated articles with full content
+  // Uses curated articles directly to ensure all articles have complete content (not truncated API excerpts)
+  // Custom articles from classroom settings are also loaded from curated data
   useEffect(() => {
-    async function fetchArticles() {
+    async function loadArticles() {
       setLoading(true)
       setError(null)
 
-      let defaultArticles: Article[] = []
+      // Get all curated articles
+      const allCuratedArticles = [...CLIMATE_CHANGE_ARTICLES, ...AI_ARTICLES]
+
+      // Step 1: Get default topic-based articles from curated data
+      let defaultArticles: Article[] = getFallbackArticles(topicId)
+      console.log('Loaded', defaultArticles.length, 'curated articles for topic:', topicId)
+
+      // Step 2: If the classroom has custom articles, add those from curated data
       let customArticles: Article[] = []
+      const customArticleIds = classroom?.customArticles
 
-      // Build curated content map once for enriching API results
-      const curatedContentMap = buildCuratedContentMap()
+      if (customArticleIds && customArticleIds.length > 0) {
+        console.log('Loading custom articles for classroom:', classroomId, 'IDs:', customArticleIds)
 
-      try {
-        // Step 1: Always fetch default topic-based articles first
-        const query = TOPIC_QUERIES[topicId] || 'artificial intelligence'
-        console.log('Fetching default articles for topic:', topicId, 'with query:', query)
+        // Find custom articles in curated data
+        const curatedMatches = allCuratedArticles
+          .filter((article) => customArticleIds.includes(article.chunk_id))
+          .map(transformCuratedArticle)
 
-        const results = await infactory.search(query, { top_k: 10 })
-        console.log('API returned', results?.length || 0, 'default topic results')
-
-        // Transform API results to our Article format, enriching with curated content
-        if (results && results.length > 0) {
-          defaultArticles = results.map((result: SearchResult) =>
-            transformSearchResult(result, curatedContentMap)
-          )
-        }
-
-        // Step 2: If the classroom has custom articles, fetch those additionally
-        const customArticleIds = classroom?.customArticles
-
-        if (customArticleIds && customArticleIds.length > 0) {
-          console.log('Fetching custom articles for classroom:', classroomId, 'IDs:', customArticleIds)
-
-          // Fetch custom articles by their chunk IDs
-          const customResults = await infactory.getArticlesByChunkIds(customArticleIds)
-          console.log('Custom articles API returned', customResults?.length || 0, 'results')
-
-          if (customResults && customResults.length > 0) {
-            customArticles = customResults.map((result: SearchResult) =>
-              transformSearchResult(result, curatedContentMap)
-            )
-          }
-
-          // If API didn't return all custom articles, try to find them in curated data as fallback
-          if (customArticles.length < customArticleIds.length) {
-            const foundIds = new Set(customArticles.map((a) => a.id))
-            const missingIds = customArticleIds.filter((id) => !foundIds.has(id))
-
-            // Search curated articles for missing IDs
-            const allCuratedArticles = [...CLIMATE_CHANGE_ARTICLES, ...AI_ARTICLES]
-            const curatedMatches = allCuratedArticles
-              .filter((article) => missingIds.includes(article.chunk_id))
-              .map(transformCuratedArticle)
-
-            customArticles = [...customArticles, ...curatedMatches]
-            console.log('Added', curatedMatches.length, 'articles from curated data for missing IDs')
-          }
-        }
-      } catch (err) {
-        console.error('API failed, falling back to curated data:', err)
-      }
-
-      // Fallback to curated data if API returned no default articles
-      if (defaultArticles.length === 0) {
-        console.log('Using fallback curated articles for topic:', topicId)
-        defaultArticles = getFallbackArticles(topicId)
+        customArticles = curatedMatches
+        console.log('Found', customArticles.length, 'custom articles in curated data')
       }
 
       // Step 3: Merge custom articles (first) with default articles, removing duplicates by ID
@@ -304,7 +227,7 @@ export function ResearchWorkspace() {
       setLoading(false)
     }
 
-    fetchArticles()
+    loadArticles()
   }, [topicId, classroom, classroomId])
 
   const handleHighlight = () => {

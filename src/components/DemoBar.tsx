@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '../lib/stores/app-store'
 
 // Check if demo controls should be visible
-// Visible in dev mode OR when ?demo=true URL param is present
+// For hackathon demo: always visible
+// To hide in production later, check import.meta.env.DEV or ?demo=true param
 function useDemoControlsVisible() {
-  const [searchParams] = useSearchParams()
-  const isDev = import.meta.env.DEV
-  const hasParam = searchParams.get('demo') === 'true'
-  return isDev || hasParam
+  // Always show for hackathon demo
+  return true
 }
 
 // Extract classroom ID from current path

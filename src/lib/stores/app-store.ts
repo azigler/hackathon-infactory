@@ -5,7 +5,7 @@ import type { User, Classroom, Highlight, Note } from '@/types'
 import { DAY_1_STATE, DAY_30_STATE } from '@/data/demo-state'
 
 // Version for localStorage schema - increment when breaking changes occur
-const STORE_VERSION = 2
+const STORE_VERSION = 3
 
 type DemoMode = 'day1' | 'day30'
 type ViewRole = 'teacher' | 'student'
@@ -42,10 +42,20 @@ export interface SubmittedEssay {
 // Citation format types
 export type CitationStyle = 'mla' | 'apa' | 'chicago'
 
+// Article metadata stored with classroom for display purposes
+export interface ArticleMetadataEntry {
+  chunk_id: string
+  title: string
+  author: string
+  section?: string
+  topic?: string
+}
+
 // Extended classroom type with share code and custom content for teacher flow
 export interface ClassroomWithShareCode extends Classroom {
   shareCode: string
   customArticles?: string[] // Article IDs added by teacher
+  customArticleMetadata?: ArticleMetadataEntry[] // Metadata for custom articles
   citationStyle?: CitationStyle // Required citation format for this classroom
 }
 
@@ -100,6 +110,7 @@ interface AppState {
     excludedKeywords?: string[]
     citationStyle?: CitationStyle
     customArticles?: string[]
+    customArticleMetadata?: ArticleMetadataEntry[]
   }) => ClassroomWithShareCode
   getClassroomByShareCode: (shareCode: string) => ClassroomWithShareCode | undefined
   getClassroomById: (id: string) => ClassroomWithShareCode | undefined
@@ -161,7 +172,7 @@ interface AppState {
   // ============================================================================
   // Classroom Article Management (bd-1pn)
   // ============================================================================
-  addArticleToClassroom: (classroomId: string, articleId: string) => void
+  addArticleToClassroom: (classroomId: string, articleId: string, metadata?: ArticleMetadataEntry) => void
   removeArticleFromClassroom: (classroomId: string, articleId: string) => void
   updateClassroomAssignment: (classroomId: string, assignmentPrompt: string) => void
 
@@ -218,6 +229,7 @@ export const useAppStore = create<AppState>()(
       shareCode,
       citationStyle: config.citationStyle || 'mla',
       customArticles: config.customArticles,
+      customArticleMetadata: config.customArticleMetadata,
     }
     set((state) => ({
       createdClassrooms: [...state.createdClassrooms, classroom],
@@ -415,7 +427,7 @@ export const useAppStore = create<AppState>()(
   // ============================================================================
   // Classroom Article Management (bd-1pn)
   // ============================================================================
-  addArticleToClassroom: (classroomId, articleId) => {
+  addArticleToClassroom: (classroomId, articleId, metadata) => {
     set((state) => ({
       createdClassrooms: state.createdClassrooms.map((classroom) => {
         if (classroom.id === classroomId) {
@@ -424,9 +436,14 @@ export const useAppStore = create<AppState>()(
           if (existingArticles.includes(articleId)) {
             return classroom
           }
+          const existingMetadata = classroom.customArticleMetadata || []
           return {
             ...classroom,
             customArticles: [...existingArticles, articleId],
+            // Add metadata if provided
+            customArticleMetadata: metadata
+              ? [...existingMetadata, metadata]
+              : existingMetadata,
           }
         }
         return classroom
@@ -442,6 +459,9 @@ export const useAppStore = create<AppState>()(
             ...classroom,
             customArticles: (classroom.customArticles || []).filter(
               (id) => id !== articleId
+            ),
+            customArticleMetadata: (classroom.customArticleMetadata || []).filter(
+              (m) => m.chunk_id !== articleId
             ),
           }
         }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { PageLayout } from '../../components/layout/PageLayout'
-import { useAppStore } from '../../lib/stores/app-store'
+import { useAppStore, type ArticleMetadataEntry } from '../../lib/stores/app-store'
 import { infactory, type SearchResult } from '../../lib/api/infactory'
 import { CLIMATE_CHANGE_ARTICLES, type CuratedArticle } from '../../data/climate-change-articles'
 import { AI_ARTICLES } from '../../data/ai-articles'
@@ -123,9 +123,9 @@ export function ClassroomCustomize() {
   }
 
   // Handle adding an article (from search results or suggestions)
-  const handleAddArticle = (articleId: string) => {
+  const handleAddArticle = (articleId: string, metadata?: ArticleMetadataEntry) => {
     if (classroomId) {
-      addArticleToClassroom(classroomId, articleId)
+      addArticleToClassroom(classroomId, articleId, metadata)
     }
   }
 
@@ -200,10 +200,11 @@ export function ClassroomCustomize() {
           ) : (
             <ul className="space-y-2">
               {(classroom.customArticles || []).map((articleId) => {
-                // Try to find title from suggested articles, then from fetched metadata
+                // Try to find title from: 1) stored metadata, 2) suggested articles, 3) fetched metadata
+                const storedMetadata = (classroom.customArticleMetadata || []).find(m => m.chunk_id === articleId)
                 const suggestedArticle = SUGGESTED_ARTICLES.find(a => a.chunk_id === articleId)
                 const fetchedMetadata = fetchedArticleMetadata.get(articleId)
-                const articleData = suggestedArticle || fetchedMetadata
+                const articleData = storedMetadata || suggestedArticle || fetchedMetadata
                 return (
                   <li
                     key={articleId}
@@ -299,7 +300,13 @@ export function ClassroomCustomize() {
                           onClick={() =>
                             inClassroom
                               ? handleRemoveArticle(articleId)
-                              : handleAddArticle(articleId)
+                              : handleAddArticle(articleId, {
+                                  chunk_id: result.chunk.chunk_id,
+                                  title: result.chunk.title,
+                                  author: result.chunk.author,
+                                  section: result.chunk.section,
+                                  topic: result.chunk.topic,
+                                })
                           }
                           className={`flex-shrink-0 px-3 py-1 text-sm font-medium rounded ${
                             inClassroom
@@ -360,7 +367,13 @@ export function ClassroomCustomize() {
                             onClick={() =>
                               inClassroom
                                 ? handleRemoveArticle(article.chunk_id)
-                                : handleAddArticle(article.chunk_id)
+                                : handleAddArticle(article.chunk_id, {
+                                    chunk_id: article.chunk_id,
+                                    title: article.title,
+                                    author: article.author,
+                                    section: article.section,
+                                    topic: article.topic,
+                                  })
                             }
                             className={`flex-shrink-0 px-3 py-1 text-sm font-medium rounded ${
                               inClassroom

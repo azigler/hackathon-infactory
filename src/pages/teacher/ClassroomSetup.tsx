@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { PageLayout } from '../../components/layout/PageLayout'
 import { CLIMATE_CHANGE_ARTICLES, type CuratedArticle } from '../../data/climate-change-articles'
 import { AI_ARTICLES } from '../../data/ai-articles'
-import { useAppStore, type ClassroomWithShareCode, type CitationStyle } from '../../lib/stores/app-store'
+import { useAppStore, type ClassroomWithShareCode, type CitationStyle, type ArticleMetadataEntry } from '../../lib/stores/app-store'
 import { infactory, type SearchResult } from '../../lib/api/infactory'
 
 // Citation style options with descriptions
@@ -93,7 +93,8 @@ export function ClassroomSetup() {
   const [isSearching, setIsSearching] = useState(false)
   const [expandedSearchResults, setExpandedSearchResults] = useState<Set<string>>(new Set())
   const [citationStyle, setCitationStyle] = useState<CitationStyle>('mla')
-  const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set())
+  // Store both article IDs and their metadata for display purposes
+  const [selectedArticles, setSelectedArticles] = useState<Map<string, ArticleMetadataEntry>>(new Map())
 
   const createClassroom = useAppStore((state) => state.createClassroom)
   const setDemoMode = useAppStore((state) => state.setDemoMode)
@@ -128,13 +129,13 @@ export function ClassroomSetup() {
     })
   }
 
-  const toggleArticleSelection = (articleId: string) => {
+  const toggleArticleSelection = (metadata: ArticleMetadataEntry) => {
     setSelectedArticles((prev) => {
-      const next = new Set(prev)
-      if (next.has(articleId)) {
-        next.delete(articleId)
+      const next = new Map(prev)
+      if (next.has(metadata.chunk_id)) {
+        next.delete(metadata.chunk_id)
       } else {
-        next.add(articleId)
+        next.set(metadata.chunk_id, metadata)
       }
       return next
     })
@@ -177,7 +178,8 @@ export function ClassroomSetup() {
       assignmentPrompt: assignmentPrompt.trim(),
       dateRange: topic.dateRange,
       citationStyle,
-      customArticles: selectedArticles.size > 0 ? Array.from(selectedArticles) : undefined,
+      customArticles: selectedArticles.size > 0 ? Array.from(selectedArticles.keys()) : undefined,
+      customArticleMetadata: selectedArticles.size > 0 ? Array.from(selectedArticles.values()) : undefined,
     })
 
     // Reset demo mode to day1 for fresh classrooms
@@ -556,7 +558,13 @@ export function ClassroomSetup() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              toggleArticleSelection(result.chunk.chunk_id)
+                              toggleArticleSelection({
+                                chunk_id: result.chunk.chunk_id,
+                                title: result.chunk.title,
+                                author: result.chunk.author,
+                                section: result.chunk.section,
+                                topic: result.chunk.topic,
+                              })
                             }}
                             className={`ml-3 px-3 py-1.5 rounded text-sm font-medium transition-colors flex-shrink-0 ${
                               isSelected

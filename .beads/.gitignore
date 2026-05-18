@@ -9,3 +9,6 @@
 # Temporary
 last-touched
 *.tmp
+
+# History snapshots (timestamped backups of issues.jsonl — not for version control)
+.br_history/

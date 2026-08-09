@@ -12,3 +12,22 @@ last-touched
 
 # History snapshots (timestamped backups of issues.jsonl — not for version control)
 .br_history/
+*.db-journal
+*.db-fsqlite-*
+.write.lock
+.br_recovery/
+.sync.lock
+sync_base.jsonl
+beads.base.jsonl
+beads.base.meta.json
+beads.left.jsonl
+beads.left.meta.json
+beads.right.jsonl
+beads.right.meta.json
+daemon.lock
+daemon.log
+daemon.pid
+bd.sock
+sync-state.json
+redirect
+.bv.lock

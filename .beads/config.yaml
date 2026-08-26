@@ -1,4 +1,6 @@
 # Beads Project Configuration
-# issue_prefix: bd
+# issue_prefix must stay UNCOMMENTED. Commented out, br falls back to its
+# default `bd-` prefix, which collides with other stores' bd-* ids.
+issue_prefix: infactory
 # default_priority: 2
 # default_type: task

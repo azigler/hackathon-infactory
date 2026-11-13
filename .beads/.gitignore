@@ -31,3 +31,11 @@ bd.sock
 sync-state.json
 redirect
 .bv.lock
+
+# br >= 0.2.x write-ahead and migration sidecars (same block as demesne .beads/.gitignore, dotfiles-ppo7n):
+# machine-local state with the DB lifecycle. studio-weekly 2026-11-13.
+.br-wal-index-*/
+*.db-wal-cert
+*.db-wal-cert-head
+*.fsqlite-migration-state
+.*.db.schema-migration-*
